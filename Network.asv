@@ -6,7 +6,7 @@ classdef Network
         q;%heat flux matrix
         r;%resistance matrix
         tConst;%isothermal temperature vector
-        qConst;%constant heat flux matrix
+        qGen;%heat generation vector
         cap;%heat capacity vector
         tau;%time constant of each node
         dt = 0.01;%time step
@@ -107,16 +107,21 @@ classdef Network
             this.r(j,i) = this.r(i,j);
         end
         
-        function this = qConstant(this,i,j,qVal)
+        function this = HeatFlux(this,i,j,qVal)
+             if this.grid
+                i = this.index2num(this.nodeMap,i);
+                j = this.index2num(this.nodeMap,j);                
+            end
             %sets constant heat flux, qVal through connection i,j
             this.qConst(i,j) = true;
-            this.qConst(j,i) = this.qConst(j,i);
+            this.qConst(j,i) = true;
             this.q(i,j) = qVal;
-            this.q(j,i) = -this.q(j,i);
+            this.q(j,i) = -qVal;
         end
         
         function this = IsoNode(this,i,tVal)
             if this.grid
+                i = this.index2num(this.nodeMap,i);
             end
             %defines node i as isothermal with temperature tVal
             this.tConst(i) = true;
@@ -189,7 +194,7 @@ classdef Network
         function this = Iterate(this) 
             newT = this.t.*0;%temporary vector to store new temperatures
             for i = 1:this.n
-                for j = i:this.n %i:n to avoid redundant work (r(i,j) = r(j,i), q(i,j) = -q(j,i), etc)
+                for j = (i+1):this.n %i:n to avoid redundant work (r(i,j) = r(j,i), q(i,j) = -q(j,i), etc)
                     if ~this.qConst(i,j)
                         if this.r(i,j)==0
                             this.q(i,j) = 0;

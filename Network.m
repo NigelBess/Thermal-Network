@@ -6,7 +6,7 @@ classdef Network
         q;%heat flux matrix
         r;%resistance matrix
         tConst;%isothermal temperature vector
-        qConst;%constant heat flux matrix
+        qGen;%heat generation vector
         cap;%heat capacity vector
         tau;%time constant of each node
         dt = 0.01;%time step
@@ -29,8 +29,7 @@ classdef Network
             this.r = this.r./0;%set all resistances to Inf
             this.tConst = zeros(1,numNodes);
             this.tConst = this.tConst == 1;%to logical
-            this.qConst = zeros(numNodes);
-            this.qConst = this.qConst == 1;%to logical
+            this.qGen = zeros(1,numNodes);
             this.cap = 0.01*ones(1,numNodes);
             this.tau = zeros(1,numNodes);
         end
@@ -107,16 +106,12 @@ classdef Network
             this.r(j,i) = this.r(i,j);
         end
         
-        function this = HeatFlux(this,i,j,qVal)
+        function this = HeatGen(this,i,qVal)
              if this.grid
-                i = this.index2num(this.nodeMap,i);
-                j = this.index2num(this.nodeMap,j);                
+                i = this.index2num(this.nodeMap,i);            
             end
             %sets constant heat flux, qVal through connection i,j
-            this.qConst(i,j) = true;
-            this.qConst(j,i) = true;
-            this.q(i,j) = qVal;
-            this.q(j,i) = -qVal;
+            this.qGen(i) = qVal;
         end
         
         function this = IsoNode(this,i,tVal)
@@ -195,21 +190,19 @@ classdef Network
             newT = this.t.*0;%temporary vector to store new temperatures
             for i = 1:this.n
                 for j = (i+1):this.n %i:n to avoid redundant work (r(i,j) = r(j,i), q(i,j) = -q(j,i), etc)
-                    if ~this.qConst(i,j)
                         if this.r(i,j)==0
                             this.q(i,j) = 0;
                         else
                             this.q(i,j) = (this.t(i)-this.t(j))/this.r(i,j);
                         end
                         this.q(j,i) = -this.q(i,j);
-                    end
                 end
             end
             
             %apply heat to each node
             for i = 1:this.n 
                 if ~this.tConst(i)
-                    newT(i) = this.t(i)+sum(this.q(:,i))/this.cap(i)*this.dt;
+                    newT(i) = this.t(i)+(sum(this.q(:,i))+this.qGen(i))/this.cap(i)*this.dt;
                 else
                     newT(i) =this.t(i); 
                 end
