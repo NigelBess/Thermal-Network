@@ -13,6 +13,7 @@ classdef Network
         maxIterations = 1E6;%after how many iterations should it stop while trying to find equilibrium
         precision = 1E-8;
         sets;%matrix of logicals. each row of the 'sets' matrix shows a set of nodes that are connected to eachother with 0 resistance
+        setsTau;%time constant associated to each set
     end
     methods(Access = public)
         function this = Initialize(this,numNodes)
@@ -73,15 +74,35 @@ classdef Network
         end
         
          function this = Time(this)%find time constant of each node, and determine an appropriate time step (tau_min/2)
-            for i = 1:this.n
-                this.tau(i) = this.Par(this.r(i,:))*this.cap(i);
+             for i = 1:this.n
+                res = this.r(i,:);
+                nonZeroRes = res(find(res>0));
+                this.tau(i) = this.Par(nonZeroRes)*this.cap(i);
+             end
+             
+            this.setsTau = Inf;%in case there are no sets
+            if any(this.sets)%if there are sets, each set will have its own time constant
+                numSets = size(this.sets)*[1;0];
+                this.setsTau = ones(1,numSets)*Inf;%prep time constant vector
+                for i = 1:numSets
+                    nodes = find(this.sets(i,:));%nodes in this set
+                    res = zeros(this.n);%resistance matrix for all resistances touching this set
+                    for k = nodes
+                        res(k,:) = this.r(k,:);
+                        res(:,k) = this.r(:,k);
+                    end
+                    nonZeroRes = res(find(res>0));
+                    this.setsTau(i) = this.Par(nonZeroRes)*sum(this.cap(nodes));
+                end
             end
-            this.dt = min(this.tau)/2;
+            
+            this.dt = min([min(this.tau),min(this.setsTau)])/2;
          end
         
         function this = Prep(this)%prep should be called before iterating but after creating all connections
-            this=this.Time;%find appropriate dt
             this=this.FindSets;
+            this=this.Time;%find appropriate dt
+            
         end
         
         function this = Transient(this,t)
@@ -132,6 +153,19 @@ classdef Network
                 end
             end
             
+            %equalize temperature over each set
+            for i = 1:size(this.sets)*[1;0]%iterate through number of sets
+                if any(this.sets(i,:))%if there are any nodes in the current set
+                    temps = newT.*this.sets(i,:);
+                    caps = this.cap.*this.sets(i,:);
+                    finalTemp = sum(temps.*caps)/sum(caps);%weighted average by heat capacity
+                    for j = 1:this.n%for each node
+                        if this.sets(i,j)%if the node is part of the set
+                            newT(j) = finalTemp;%set new temperature of that node
+                        end
+                    end
+                end
+            end
             
             this.t = newT;
         end
@@ -150,11 +184,11 @@ classdef Network
             end      
         end
         
-        function this = addConnected(this,t1,indices,setNumber)
-            if ~this.sets(setNumber,t1)
-                this.sets(setNumber,t1) = true;
+        function this = addConnected(this,node,indices,setNumber)
+            if ~this.sets(setNumber,node)
+                this.sets(setNumber,node) = true;
                 %find nodes that connect from t1
-                relevantIndices = find(indices(:,1)==t1);
+                relevantIndices = find(indices(:,1)==node);
                 connectedNodes = zeros(1,length(relevantIndices));
                 for i = 1:length(relevantIndices)
                     connectedNodes(i) = indices(relevantIndices(i),2);
