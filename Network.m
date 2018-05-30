@@ -14,8 +14,9 @@ classdef Network
         precision = 1E-8;
         sets;%matrix of logicals. each row of the 'sets' matrix shows a set of nodes that are connected to eachother with 0 resistance
         setsTau;%time constant associated to each set
-        grid;%boolean. Is this network a grid?
-        nodeMap;%nodes aligned in grid form. Only useful if the network is a grid
+        grid = false;%boolean. Is this network a grid?
+        nodeMap;%each element of nodemap contains the node number associated with that position in the map (only applicable for grid networks)
+        mappedTemps;%used to visualize the grid
     end
     methods(Access = public)
         function this = Initialize(this,numNodes)
@@ -32,8 +33,48 @@ classdef Network
             this.qConst = this.qConst == 1;%to logical
             this.cap = 0.01*ones(1,numNodes);
             this.tau = zeros(1,numNodes);
-            
         end
+        
+        function this = GridInit(this,x,y)%Initialize as x by y grid
+            this = this.Initialize(x*y);
+            this.grid = true;
+            this.nodeMap = zeros(x,y);
+            for i = 1:numel(this.nodeMap)
+                this.nodeMap(i) = i;
+            end
+            this.nodeMap = this.nodeMap.';
+        end
+        
+        function this = GridConnect(this,r,xbounds,ybounds)
+            if ~this.grid
+                error("Network.GridConnect only works for grid networks. To initialize as x by y grid, call 'Network.GridInit(x,y)'");
+            end
+            if nargin == 2%if xbounds and ybounds not specified then we will connect the entire grid
+                xbounds = [1,size(this.nodeMap,1)];
+                ybounds = [1,size(this.nodeMap,2)];
+            end
+                
+             for i = xbounds(1):xbounds(end)
+                for j = ybounds(1):ybounds(end)
+                    if i<xbounds(end)
+                        this=this.DisConn(this.nodeMap(i,j),this.nodeMap(i+1,j));%remove any pre-existing connection
+                        this=this.Conn(this.nodeMap(i,j),this.nodeMap(i+1,j),r);
+                    end
+                    if j<ybounds(end)
+                        this=this.DisConn(this.nodeMap(i,j),this.nodeMap(i,j+1));%remove any pre-existing connection
+                        this=this.Conn(this.nodeMap(i,j),this.nodeMap(i,j+1),r);
+                    end
+                end
+             end
+        end
+        
+        function this = MapGrid(this)
+            this.mappedTemps = this.nodeMap;%allcate
+            for i = 1:this.n
+                this.mappedTemps(i) = this.t(this.nodeMap(i));
+            end
+        end
+        
         function this = Conn(this,i,j,r)%connect node i to node j via resistance (r)
             if nargin == 3
                 r = 0;
@@ -45,9 +86,6 @@ classdef Network
         end
         
         function this = DisConn(this,i,j,r)%disconnect node i and node j
-            if ~this.c(i,j)%are the nodes not connexted
-                error('These nodes are not connected')
-            end
             if nargin == 3%left out resistance parameter
                 this.r(i,j) = Inf;%set resistance to Inf
                 this.c(i,j) = false;%remove connection
@@ -69,7 +107,7 @@ classdef Network
             this.q(j,i) = -this.q(j,i);
         end
         
-        function this = tConstant(this,i,tVal)
+        function this = IsoNode(this,i,tVal)
             %defines node i as isothermal with temperature tVal
             this.tConst(i) = true;
             this.t(i) = tVal;
@@ -104,6 +142,7 @@ classdef Network
         function this = Prep(this)%prep should be called before iterating but after creating all connections
             this=this.FindSets;
             this=this.Time;%find appropriate dt
+            this = this.IsoSets;
             
         end
         
@@ -116,6 +155,9 @@ classdef Network
             for i = 0:this.dt:t
                 this = this.Iterate;
             end
+            if this.grid
+                this=this.MapGrid;
+            end
         end
         
         function this = Equilibrium(this)
@@ -124,11 +166,14 @@ classdef Network
             for i = 1:this.maxIterations              
                 this = this.Iterate;
                 if all(abs(this.t-tLast)<this.precision) %has EVERY temperature changed by less than desired precision?
+                    if this.grid
+                        this = this.MapGrid;
+                    end
                     return;
                 end
                 tLast = this.t;
             end
-            error('System did not equilibriate after %d iterations',this.maxIterations);
+            error('System did not equilibriate after %d iterations.\n Change "maxIterations property to increase number of interations (NOT RECOMMENDED)"',this.maxIterations);
         end
         
         function this = Iterate(this) 
@@ -175,32 +220,63 @@ classdef Network
         
         function this = FindSets(this)%finds all sets of nodes connected by 0 resistance
             rEdit = this.r;
-            indices = this.num2index(rEdit,find(rEdit==0));
-            affectedNodes = unique(indices);
+            indices = this.num2index(rEdit,find(rEdit==0));%indices is an unknown-by-2 matrix where each row is the indices of the resistance matrix where resistance = 0
+            affectedNodes = unique(indices)';
             maxSets = floor(numel(affectedNodes)/2);%there can only be an integer number of sets. Each set has at least 2 nodes. 
             this.sets = zeros(maxSets,this.n)==1;%prep the sets matrix
             
-
-            for i = 1:maxSets
-                this = this.addConnected(affectedNodes(i),indices,i);
-            end      
-        end
-        
-        function this = addConnected(this,node,indices,setNumber)
-            if ~this.sets(setNumber,node)
-                this.sets(setNumber,node) = true;
-                %find nodes that connect from t1
-                relevantIndices = find(indices(:,1)==node);
-                connectedNodes = zeros(1,length(relevantIndices));
-                for i = 1:length(relevantIndices)
-                    connectedNodes(i) = indices(relevantIndices(i),2);
+            setNumber = 1;
+            for i = affectedNodes
+                if ~any(this.sets(:,i))
+                    [this,indices] = this.addConnected(i,indices,setNumber);
+                    setNumber = setNumber+1;
                 end
-                
-                for i = connectedNodes
-                    this = this.addConnected(i,indices,setNumber);
+            end 
+            for i = 1:maxSets
+                if ~any(this.sets(i,:))
+                    this.sets(i,:)=[];
                 end
             end
         end
+        
+       function [this,indices] = addConnected(this,node,indices,setNumber)
+            if ~this.sets(setNumber,node)%Has this node already been added? This ends the recursion
+                this.sets(setNumber,node) = true;%add this node
+                
+                %find nodes that also connect to this node
+                relevantIndices = find(indices(:,1)==node);
+                connectedNodes = zeros(1,length(relevantIndices)); 
+                for i = 1:length(relevantIndices)
+                    connectedNodes(i) = indices(relevantIndices(i),2);
+                    %this.sets(setNumber,connectedNodes(i)) = true;%add nodes that connect to this node
+                end
+                for i = 1:length(relevantIndices)
+                    indices(i,:) = [];  
+                end
+                
+                for i = connectedNodes
+                    [this,indices] = this.addConnected(i,indices,setNumber);
+                end
+            end
+       end
+        
+        function this = IsoSets(this)
+            numSets = size(this.sets,1);
+            for i =1:numSets
+                if any(and(this.sets(i,:),this.tConst))%is any member of the set isothermal?
+                    temps = this.t(find(this.t.*this.tConst.*this.sets(i,:)));%get all the isothermal temperatures in the set   
+                        if ~all(temps==temps(1))%are there any temperature mismatches among isothermal nodes in the set?
+                            error("Multiple isothermal temperatures set within a supernode. Only one isothermal temperature can exist in a single node");
+                        end
+                    for j = 1:this.n
+                        if this.sets(i,j)
+                            this = this.IsoNode(j,temps(1));
+                        end
+                    end
+                end
+            end
+        end
+        
         
             
         function out = Par(~,rVec)%resistance in parralel
