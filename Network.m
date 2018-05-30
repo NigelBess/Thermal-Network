@@ -76,6 +76,10 @@ classdef Network
         end
         
         function this = Conn(this,i,j,r)%connect node i to node j via resistance (r)
+            if this.grid
+                i = this.index2num(this.nodeMap,i);
+                j = this.index2num(this.nodeMap,j);
+            end
             if nargin == 3
                 r = 0;
             end
@@ -86,6 +90,10 @@ classdef Network
         end
         
         function this = DisConn(this,i,j,r)%disconnect node i and node j
+            if this.grid
+                i = this.index2num(this.nodeMap,i);
+                j = this.index2num(this.nodeMap,j);
+            end
             if nargin == 3%left out resistance parameter
                 this.r(i,j) = Inf;%set resistance to Inf
                 this.c(i,j) = false;%remove connection
@@ -99,15 +107,22 @@ classdef Network
             this.r(j,i) = this.r(i,j);
         end
         
-        function this = qConstant(this,i,j,qVal)
+        function this = HeatFlux(this,i,j,qVal)
+             if this.grid
+                i = this.index2num(this.nodeMap,i);
+                j = this.index2num(this.nodeMap,j);                
+            end
             %sets constant heat flux, qVal through connection i,j
             this.qConst(i,j) = true;
-            this.qConst(j,i) = this.qConst(j,i);
+            this.qConst(j,i) = true;
             this.q(i,j) = qVal;
-            this.q(j,i) = -this.q(j,i);
+            this.q(j,i) = -qVal;
         end
         
         function this = IsoNode(this,i,tVal)
+            if this.grid
+                i = this.index2num(this.nodeMap,i);
+            end
             %defines node i as isothermal with temperature tVal
             this.tConst(i) = true;
             this.t(i) = tVal;
@@ -179,7 +194,7 @@ classdef Network
         function this = Iterate(this) 
             newT = this.t.*0;%temporary vector to store new temperatures
             for i = 1:this.n
-                for j = i:this.n %i:n to avoid redundant work (r(i,j) = r(j,i), q(i,j) = -q(j,i), etc)
+                for j = (i+1):this.n %i:n to avoid redundant work (r(i,j) = r(j,i), q(i,j) = -q(j,i), etc)
                     if ~this.qConst(i,j)
                         if this.r(i,j)==0
                             this.q(i,j) = 0;
@@ -282,6 +297,15 @@ classdef Network
         function out = Par(~,rVec)%resistance in parralel
              rVec = 1./rVec;
              out = 1/sum(rVec);
+        end
+        
+        function out = index2num(~,mat,index)
+            if numel(index) == 1
+                out = index;
+                return;
+            end
+            col = size(mat,2);
+            out = (index(1)-1)*col+index(2);
         end
         function out = num2index(~,mat,num)%returns indices of element 'num' in matrix 'mat'
             amount = numel(num);
