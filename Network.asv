@@ -108,31 +108,24 @@ classdef Network
             error('System did not equilibriate after %d iterations',this.maxIterations);
         end
         
-        function this = Iterate(this) 
+        function this = Iterate(this)
             newT = this.t.*0;%temporary vector to store new temperatures
             for i = 1:this.n
                 for j = i:this.n %i:n to avoid redundant work (r(i,j) = r(j,i), q(i,j) = -q(j,i), etc)
                     if ~this.qConst(i,j)
-                        if this.r(i,j)==0
-                            this.q(i,j) = 0;
-                        else
-                            this.q(i,j) = (this.t(i)-this.t(j))/this.r(i,j);
-                        end
+                        this.q(i,j) = (this.t(i)-this.t(j))/this.r(i,j);
                         this.q(j,i) = -this.q(i,j);
                     end
                 end
             end
             
-            %apply heat to each node
-            for i = 1:this.n 
+            for i = 1:this.n
                 if ~this.tConst(i)
                     newT(i) = this.t(i)+sum(this.q(:,i))/this.cap(i)*this.dt;
                 else
                     newT(i) =this.t(i); 
                 end
             end
-            
-            
             this.t = newT;
         end
         
@@ -141,7 +134,7 @@ classdef Network
             rEdit = this.r;
             indices = this.num2index(rEdit,find(rEdit==0));
             affectedNodes = unique(indices);
-            maxSets = floor(numel(affectedNodes)/2);%there can only be an integer number of sets. Each set has at least 2 nodes. 
+            maxSets = floor(affectedNodes/2);%there can only be an integer number of sets. Each set has at least 2 nodes. 
             this.sets = zeros(maxSets,this.n)==1;%prep the sets matrix
             
 
