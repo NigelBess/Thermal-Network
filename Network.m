@@ -14,6 +14,8 @@ classdef Network
         precision = 1E-8;
         sets;%matrix of logicals. each row of the 'sets' matrix shows a set of nodes that are connected to eachother with 0 resistance
         setsTau;%time constant associated to each set
+        grid;%boolean. Is this network a grid?
+        nodeMap;%nodes aligned in grid form. Only useful if the network is a grid
     end
     methods(Access = public)
         function this = Initialize(this,numNodes)
@@ -81,8 +83,8 @@ classdef Network
              end
              
             this.setsTau = Inf;%in case there are no sets
-            if any(this.sets)%if there are sets, each set will have its own time constant
-                numSets = size(this.sets)*[1;0];
+            if any(any(this.sets))%if there are sets, each set will have its own time constant
+                numSets = size(this.sets,1);
                 this.setsTau = ones(1,numSets)*Inf;%prep time constant vector
                 for i = 1:numSets
                     nodes = find(this.sets(i,:));%nodes in this set

@@ -1,0 +1,25 @@
+clc;
+clear;
+r = 1;
+c = 0.01;
+t1 = 400;
+t16 = 300;
+
+n = Network;
+n = n.Initialize(16);%the network has 16 nodes
+n = n.tConstant(1,t1);%node 1 is isothermal with temperature t1
+n = n.tConstant(16,300);%node 16 is isothermal with temperature t16
+
+nodeMap = zeros(4);%used for setting up a grid of nodes
+for i = numel(nodeMap)
+    nodeMap(i) = i;
+end
+for i = size(nodeMap,1)
+    for j = size(nodeMap,2)
+        n=n.Conn(nodeMap(i,j))
+    end
+end
+
+
+n = n.Prep;
+n = n.Iterate
