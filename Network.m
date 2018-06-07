@@ -17,6 +17,7 @@ classdef Network
         grid = false;%boolean. Is this network a grid?
         nodeMap;%each element of nodemap contains the node number associated with that position in the map (only applicable for grid networks)
         mappedTemps;%used to visualize the grid
+        rad = false;%boolean. Is this a radiative network?
     end
     methods(Access = public)
         function this = Initialize(this,numNodes)
@@ -187,27 +188,39 @@ classdef Network
         end
         
         function this = Iterate(this) 
-            newT = this.t.*0;%temporary vector to store new temperatures
-            for i = 1:this.n
-                for j = (i+1):this.n %i:n to avoid redundant work (r(i,j) = r(j,i), q(i,j) = -q(j,i), etc)
-                        if this.r(i,j)==0
-                            this.q(i,j) = 0;
+            this = CalcHeat(this);
+            this = ApplyHeat(this);
+            
+        end
+        function this = CalcHeat(this)
+           for i = 1:this.n
+            for j = (i+1):this.n %i:n to avoid redundant work (r(i,j) = r(j,i), q(i,j) = -q(j,i), etc)
+                    if this.r(i,j)==0
+                        this.q(i,j) = 0;
+                    else
+                        this.q(i,j) = (this.t(i)-this.t(j))/this.r(i,j);
+                    end
+                    this.q(j,i) = -this.q(i,j);
+            end
+           end
+        end
+             function this = ApplyHeat(this)
+                 sig = 5.67E-8;
+                       newT = this.t.*0;%temporary vector to store new temperatures
+
+                    %apply heat to each node
+                    for i = 1:this.n 
+                        if ~this.tConst(i)
+                            deltaT = ((sum(this.q(:,i))+this.qGen(i))/this.cap(i)*this.dt);
+                           if ~this.rad
+                                newT(i) = this.t(i)+deltaT ;
+                           else
+                               newT(i) = ((this.t(i)/sig)^(1/4)+deltaT)^(4)*sig;
+                           end
                         else
-                            this.q(i,j) = (this.t(i)-this.t(j))/this.r(i,j);
+                            newT(i) =this.t(i); 
                         end
-                        this.q(j,i) = -this.q(i,j);
-                end
-            end
-            
-            %apply heat to each node
-            for i = 1:this.n 
-                if ~this.tConst(i)
-                    newT(i) = this.t(i)+(sum(this.q(:,i))+this.qGen(i))/this.cap(i)*this.dt;
-                else
-                    newT(i) =this.t(i); 
-                end
-            end
-            
+                    end            
             %equalize temperature over each set
             for i = 1:size(this.sets)*[1;0]%iterate through number of sets
                 if any(this.sets(i,:))%if there are any nodes in the current set
@@ -292,7 +305,7 @@ classdef Network
              out = 1/sum(rVec);
         end
         
-        function out = index2num(~,mat,index)
+        function out = index2num(~,mat,index)%double index to single index conversion for matrix 'mat'
             if numel(index) == 1
                 out = index;
                 return;
@@ -305,6 +318,13 @@ classdef Network
             out = zeros(amount,2);
             for k = 1:amount
                 [out(k,1),out(k,2)] = ind2sub(size(mat),num(k));
+            end
+        end
+        function out = Conv(this)
+            if this.rad
+                out = (this.t./5.67E-8).^(1/4);
+            else
+                out = this.t;
             end
         end
     end
