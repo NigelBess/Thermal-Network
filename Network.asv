@@ -53,16 +53,16 @@ classdef Network
             if ~this.grid
                 error("Network.GridConnect only works for grid networks. To initialize as x by y grid, call 'Network.GridInit(x,y)'");
             end
-            if nargin == 2%if nodes not specified then we will connect the entire grid
-                node1 = [1,1];
-                node2 = size(this.nodeMap);
+            if nargin == 2%if xbounds and ybounds not specified then we will connect the entire grid
+                xbounds = [1,size(this.nodeMap,1)];
+                ybounds = [1,size(this.nodeMap,2)];
             end
             xbounds = zeros(1,2);
             ybounds = xbounds;
             xbounds(1) = min([node1(1),node2(1)]);
             xbounds(2) = max([node1(1),node2(1)]);
-            ybounds(1) = min([node1(2),node2(2)]);
-            ybounds(2) = max([node1(2),node2(2)]);
+            ybounds(1) = min([node1(1),node2(1)]);
+            xbounds(2) = max([node1(1),node2(1)]);
                 
              for i = xbounds(1):xbounds(end)
                 for j = ybounds(1):ybounds(end)
@@ -82,9 +82,7 @@ classdef Network
              end
              this = this.MapGrid;
         end
-        function this = GridDisConn(this,node1,node2)
-            this = this.GridConnect(Inf,node1,node2);
-        end
+        
         function this = MapGrid(this)
             this.mappedTemps = this.nodeMap;%allcate
             for i = 1:this.n
