@@ -47,10 +47,7 @@ classdef Network
             end
             this.nodeMap = this.nodeMap.';
         end
-        function this = RadInit(this,numNodes)
-            this = this.Initialize(numNodes);
-            this.rad = true;
-        end
+        
         function this = GridConnect(this,r,node1,node2)
             
             if ~this.grid
@@ -153,12 +150,12 @@ classdef Network
              if this.rad
                  for i = 1:this.n
                     for j = 1:this.n
-                        tempR(i,j) = this.r(i,j)/5.67E-8/(this.t(i)^2+this.t(j)^2)/(this.t(i)+this.t(j));
+                        tempR(i,j) = this.r(i,j)/5.67E-8/(this.t(i))
                     end
                  end
              end
              for i = 1:this.n
-                res = tempR(i,:);
+                res = this.r(i,:);
                 nonZeroRes = res(find(res>0));
                 this.tau(i) = this.Par(nonZeroRes)*this.cap(i);
              end
@@ -171,8 +168,8 @@ classdef Network
                     nodes = find(this.sets(i,:));%nodes in this set
                     res = zeros(this.n);%resistance matrix for all resistances touching this set
                     for k = nodes
-                        res(k,:) = tempR(k,:);
-                        res(:,k) = tempR(:,k);
+                        res(k,:) = this.r(k,:);
+                        res(:,k) = this.r(:,k);
                     end
                     nonZeroRes = res(find(res>0));
                     this.setsTau(i) = this.Par(nonZeroRes)*sum(this.cap(nodes));

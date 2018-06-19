@@ -1,0 +1,54 @@
+%given
+t1 = 300;
+t3 = 500;
+r12 = 10;
+r23 = 12;
+
+%boltzman constant
+sig = 5.67E-8;
+
+%initialize networks
+c = Network; % conductive
+r = Network; % radiative
+c = c.Initialize(2);
+r = r.RadInit(2);
+
+%connections
+c = c.Conn(1,2,r12);
+r = r.Conn(1,2,r23);
+
+%isothermal nodes
+c = c.IsoNode(1,t1);
+r = r.IsoNode(2,sig*(t3^4));%black body radiation
+
+%set initial conditions to solve for time constants.
+%I will choose t2 = 400 as an initial condition. (arbitrary)
+c.t(2) = 400;
+r.t(1) = sig*(400^4);
+
+%prep
+c = c.Prep;
+r = r.Prep;
+
+%choose the smallest recommended time step
+dt = c.dt;%min([c.dt r.dt]);
+
+for i = 1:10000%manually iterate 10000 times (arbitrary large number)
+c = c.CalcHeat;
+r = r.CalcHeat;
+c = c.ApplyHeat;
+r = r.ApplyHeat;
+
+%te
+t2Rad = 
+
+%reset heat generation
+c.qGen(:) = 0;
+r.qGen(:) = 0;
+
+%transfer heat between networks
+c.qGen(2) = -c.q(1,2);
+r.qGen(1) = c.q(1,2);
+
+
+end
