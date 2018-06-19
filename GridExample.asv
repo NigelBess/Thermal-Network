@@ -1,0 +1,12 @@
+%given
+t11 = 300;
+q63 = 200;
+endTime = 100;
+r1 = 10;
+r2 = 50;
+
+%network setup
+g = Network;
+g = g.GridInit(7,4);
+g = g.GridConnect(r1);
+g = g.GridConnect()

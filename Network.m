@@ -41,7 +41,7 @@ classdef Network
             end
             this = this.Initialize(x*y);
             this.grid = true;
-            this.nodeMap = zeros(x,y);
+            this.nodeMap = zeros(y,x);
             for i = 1:numel(this.nodeMap)
                 this.nodeMap(i) = i;
             end
@@ -93,9 +93,11 @@ classdef Network
         end
         
         function this = Conn(this,i,j,r)%connect node i to node j via resistance (r)
-            if this.grid
-                i = this.index2num(this.nodeMap,i);
-                j = this.index2num(this.nodeMap,j);
+            if this.grid && (numel(i)==2)
+                i = this.nodeMap(i(1),i(2));            
+            end
+            if this.grid && (numel(j)==2)
+                j = this.nodeMap(j(1),j(2));            
             end
             if nargin == 3
                 r = 0;
@@ -107,9 +109,11 @@ classdef Network
         end
         
         function this = DisConn(this,i,j,r)%disconnect node i and node j
-            if this.grid
-                i = this.index2num(this.nodeMap,i);
-                j = this.index2num(this.nodeMap,j);
+            if this.grid && (numel(i)==2)
+                i = this.nodeMap(i(1),i(2));            
+            end
+            if this.grid && (numel(j)==2)
+                j = this.nodeMap(j(1),j(2));            
             end
             if nargin == 3%left out resistance parameter
                 this.r(i,j) = Inf;%set resistance to Inf
@@ -125,16 +129,16 @@ classdef Network
         end
         
         function this = HeatGen(this,i,qVal)
-             if this.grid
-                i = this.index2num(this.nodeMap,i);            
+             if this.grid && (numel(i)==2)
+                i = this.nodeMap(i(1),i(2));            
             end
             %sets constant heat flux, qVal through connection i,j
             this.qGen(i) = qVal;
         end
         
         function this = IsoNode(this,i,tVal)
-            if this.grid
-                i = this.index2num(this.nodeMap,i);
+            if this.grid && (numel(i)==2)
+                i = this.nodeMap(i(1),i(2));            
             end
             %defines node i as isothermal with temperature tVal
             this.tConst(i) = true;
@@ -221,7 +225,7 @@ classdef Network
             end
            end
         end
-             function this = ApplyHeat(this)
+        function this = ApplyHeat(this)
                  sig = 5.67E-8;
                        newT = this.t.*0;%temporary vector to store new temperatures
 
